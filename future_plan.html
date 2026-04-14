@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Next Month Planning | Smart Budget Tracker</title>
+    <!-- Chart.js CDN (unchanged) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="future_plan_styles.css">
+</head>
+<body>
+
+<div class="container">
+    <div class="planning-paper">
+        <!-- Centered header with colorful calendar icon -->
+        <div class="page-header">
+            <h2>
+                <span class="calendar-icon">📅</span>
+                <span>Next Month Planning</span>
+            </h2>
+        </div>
+
+        <!-- STEP 1: Salary section -->
+        <div class="card-section">
+            <div class="salary-row">
+                <div class="field" style="flex:2">
+                    <label>💰 Monthly income (₹)</label>
+                    <input type="number" id="salaryInput" placeholder="e.g., 50000" step="any">
+                </div>
+                <div class="field" style="flex:1">
+                    <button onclick="setSalary()" style="margin-top: 1.55rem;">Set Salary →</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 2: Add planned expenses -->
+        <div class="card-section">
+            <div class="input-group">
+                <div class="field">
+                    <label>📌 Expense name</label>
+                    <input type="text" id="desc" placeholder="e.g., Rent, Groceries">
+                </div>
+                <div class="field">
+                    <label>💸 Amount (₹)</label>
+                    <input type="number" id="amount" placeholder="Amount">
+                </div>
+                <div class="field" style="flex:0.6; min-width:120px;">
+                    <button onclick="addExpense()" style="margin-top: 1.55rem;">+ Add Expense</button>
+                </div>
+            </div>
+            <div class="expense-summary" id="expenseHint">
+                💡 <span>Note:</span> Add planned expenses for next month — they will be merged with current month's data.
+            </div>
+        </div>
+
+        <!-- CHART SECTION -->
+        <div class="card-section" style="padding-bottom: 1rem;">
+            <div class="chart-container">
+                <canvas id="chart"></canvas>
+            </div>
+        </div>
+
+        <!-- SUGGESTION area -->
+        <div class="suggestion-card">
+            <span>🧠 SMART INSIGHT</span>
+            <hr>
+            <div id="suggestion"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ---------- ORIGINAL LOGIC (preserved 100%) ----------
+    let salary = 0;
+    let expenses = [];
+
+    // Load CURRENT expenses from localStorage (unchanged keys)
+    const USERS_KEY = "expense_users";
+    const SESSION_KEY = "expense_logged_user";
+
+    function loadCurrentExpenses() {
+        const email = localStorage.getItem(SESSION_KEY);
+        if (!email) return [];
+
+        const users = JSON.parse(localStorage.getItem(USERS_KEY)) || [];
+        const user = users.find(u => u.email === email);
+
+        return user?.expenses || [];
+    }
+
+    // Merge current + future expenses (exactly same logic)
+    let allExpenses = loadCurrentExpenses();
+
+    // SET SALARY (identical)
+    function setSalary() {
+        salary = parseFloat(document.getElementById("salaryInput").value);
+        if (isNaN(salary)) salary = 0;
+        updateChart();
+    }
+
+    // ADD FUTURE EXPENSE (identical)
+    function addExpense() {
+        const desc = document.getElementById("desc").value;
+        const amount = parseFloat(document.getElementById("amount").value);
+
+        if (!salary) {
+            alert("⚠️ Please enter salary first!");
+            return;
+        }
+
+        if (!desc || !amount) {
+            alert("Enter valid data");
+            return;
+        }
+
+        allExpenses.push({ description: desc, amount: amount });
+        // clear fields after adding for better UX (but not altering core logic)
+        document.getElementById("desc").value = "";
+        document.getElementById("amount").value = "";
+        updateChart();
+    }
+
+    // DRAW CHART (identical, with Chart.js instance)
+    let chart;
+
+    function updateChart() {
+        const map = {};
+
+        allExpenses.forEach(e => {
+            map[e.description] = (map[e.description] || 0) + e.amount;
+        });
+
+        const labels = Object.keys(map);
+        const data = Object.values(map);
+
+        if (chart) chart.destroy();
+
+        const ctx = document.getElementById("chart").getContext("2d");
+
+        chart = new Chart(ctx, {
+            type: "bar",
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: "Expenses",
+                    data: data,
+                    backgroundColor: 'rgba(174, 129, 98, 0.7)',
+                    borderRadius: 10,
+                    borderSkipped: false,
+                    barPercentage: 0.65,
+                    categoryPercentage: 0.8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        labels: {
+                            font: { size: 12, weight: '500' },
+                            color: '#4a3b2f'
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: '#2c241e',
+                        titleColor: '#f2e0d0',
+                        callbacks: {
+                            label: function(context) {
+                                let val = context.raw;
+                                return ` ₹ ${val.toLocaleString('en-IN')}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#ede0d6' },
+                        ticks: {
+                            callback: function(value) {
+                                return '₹' + value.toLocaleString('en-IN');
+                            }
+                        }
+                    },
+                    x: {
+                        ticks: { font: { size: 11, weight: '500' }, color: '#5a4a3a' }
+                    }
+                }
+            }
+        });
+
+        generateSuggestion();
+    }
+
+    // SMART SUGGESTION LOGIC (EXACTLY as original, unchanged)
+    function generateSuggestion() {
+        const total = allExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+        let msg = "";
+
+        if (salary === 0) {
+            msg = "Enter salary to get planning tips";
+        } else if (total > salary) {
+            msg = "⚠️ Your expenses exceed salary! Reduce spending.";
+        } else {
+            const remaining = salary - total;
+
+            msg = `✅ Good planning! You will save ₹${remaining}`;
+
+            if (remaining < salary * 0.2) {
+                msg += " ⚠️ Try to save at least 20%";
+            }
+        }
+
+        document.getElementById("suggestion").innerText = msg;
+    }
+
+    // INITIAL LOAD → show current expenses chart (exactly original behavior)
+    updateChart();
+</script>
+
+</body>
+</html>
